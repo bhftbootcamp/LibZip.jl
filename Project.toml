@@ -1,0 +1,11 @@
+name = "LibZip"
+uuid = "89089acc-ee81-44d2-83aa-3aa2951b1031"
+version = "1.0.0"
+
+[deps]
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+libzip_jll = "337d8026-41b4-5cde-a456-74a10e5b31d1"
+
+[compat]
+libzip_jll = "1.11.1"
+julia = "1.8"
