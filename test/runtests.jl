@@ -48,7 +48,7 @@ using Test
         @test_throws ZipError read(zip, 1)
         @test_throws ZipError zip_get_file_info(zip, 1)
         close(zip)
-        @test_throws ZipError length(zip)
+        @test_throws AssertionError length(zip)
     end
 
     @testset "Test 4: ZipArchive to vector" begin
