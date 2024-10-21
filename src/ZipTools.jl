@@ -239,7 +239,7 @@ end
 #__ Utils
 
 function check_closed(zip::ZipArchive)
-    isopen(zip) || throw(ZipError(LIBZIP_ER_ZIPCLOSED))
+    @assert isopen(zip) "zip archive was closed"
     return nothing
 end
 
