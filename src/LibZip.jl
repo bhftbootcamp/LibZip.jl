@@ -184,7 +184,8 @@ export libzip_error_init,
     libzip_error_code_system,
     libzip_error_strerror,
     libzip_strerror,
-    libzip_source_error
+    libzip_source_error,
+    zip_error_fini
 
 export ZipArchive,
     ZipError,
@@ -572,6 +573,10 @@ end
 
 function libzip_source_error(source)
     return ccall((:zip_source_error, libzip), Ptr{LibZipErrorT}, (Ptr{LibZipSourceT},), source)
+end
+
+function zip_error_fini(ze)
+    return ccall((:zip_error_fini, libzip), Cvoid, (Ptr{LibZipErrorT},), ze)
 end
 
 include("ZipTools.jl")
