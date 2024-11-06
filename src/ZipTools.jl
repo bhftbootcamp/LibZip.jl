@@ -153,6 +153,8 @@ Type describing zip archive for reading and writing.
 - `source_ptr::Ptr{LibZipSourceT}`: The pointer to the C library source structure.
 - `comment::String`: The archives's comment.
 - `closed::Bool`: Flag indicating whether the archive is closed.
+- `_data::Union{Nothing,Vector{UInt8}}`: The service field for preserving data in the archive.
+- `_data_refs::Union{Nothing,Vector{Ref}}`: The service field for preserving data being written.
 """
 mutable struct ZipArchive
     archive_ptr::Ptr{LibZipT}

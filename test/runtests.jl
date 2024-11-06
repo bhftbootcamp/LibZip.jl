@@ -23,18 +23,23 @@ using Test
 
         zip_add_dir!(zip, "empty_dir/")
         @test length(zip) == 3
+
+        @test isnothing(zip._data)
+        @test length(zip._data_refs) == 2
     end
 
     @testset "Test 2: Iterator ZipArchive" begin
         zip = zip_open("data/simple_archive.zip")
         @test zip.comment |> isempty
         @test length(collect(zip)) == 4
+        @test isnothing(zip._data)
         close(zip)
 
         zip = ZipArchive(read("data/encrypted_archive.zip"))
         @test zip.comment == "password: 1234"
         zip_default_password!(zip, "1234")
         @test length(collect(zip)) == 4
+        @test !isnothing(zip._data)
     end
 
     @testset "Test 3: ZipError" begin
