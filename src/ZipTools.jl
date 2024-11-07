@@ -153,16 +153,16 @@ Type describing zip archive for reading and writing.
 - `source_ptr::Ptr{LibZipSourceT}`: The pointer to the C library source structure.
 - `comment::String`: The archives's comment.
 - `closed::Bool`: Flag indicating whether the archive is closed.
-- `_data::Union{Nothing,Vector{UInt8}}`: The service field for preserving data in the archive.
-- `_data_refs::Union{Nothing,Vector{Ref}}`: The service field for preserving data being written.
+- `archive_data::Union{Nothing,Vector{UInt8}}`: The service field for preserving data in the archive.
+- `data_refs::Union{Nothing,Vector{Ref}}`: The service field for preserving data being written.
 """
 mutable struct ZipArchive
     archive_ptr::Ptr{LibZipT}
     source_ptr::Ptr{LibZipSourceT}
     comment::String
     closed::Bool
-    _data::Union{Nothing,Vector{UInt8}}
-    _data_refs::Union{Nothing,Vector{Ref}}
+    archive_data::Union{Nothing,Vector{UInt8}}
+    data_refs::Union{Nothing,Vector{Ref}}
 
     function ZipArchive(
         archive_ptr::Ptr{LibZipT}, 
@@ -312,8 +312,8 @@ function zip_discard(zip::ZipArchive)
     if isopen(zip)
         libzip_source_free(zip.source_ptr)
         libzip_discard(zip.archive_ptr)
-        zip._data = nothing
-        zip._data_refs = nothing
+        zip.archive_data = nothing
+        zip.data_refs = nothing
         zip.closed = true
     end
 end
@@ -530,7 +530,7 @@ function Base.write(
     flags::UInt32 = LIBZIP_FL_OVERWRITE,
 )
     check_closed(zip)
-    push!(zip._data_refs, Ref(data))
+    push!(zip.data_refs, Ref(data))
     status = libzip_file_add(zip.archive_ptr, filename, init_source(data), flags)
     status >= 0 || throw(ZipError(zip_error_code(zip)))
     return nothing
