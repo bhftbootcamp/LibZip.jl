@@ -153,17 +153,25 @@ Type describing zip archive for reading and writing.
 - `source_ptr::Ptr{LibZipSourceT}`: The pointer to the C library source structure.
 - `comment::String`: The archives's comment.
 - `closed::Bool`: Flag indicating whether the archive is closed.
+- `archive_data::Union{Nothing,Vector{UInt8}}`: The service field for preserving data in the archive.
+- `data_refs::Union{Nothing,Vector{Ref}}`: The service field for preserving data being written.
 """
 mutable struct ZipArchive
     archive_ptr::Ptr{LibZipT}
     source_ptr::Ptr{LibZipSourceT}
     comment::String
     closed::Bool
+    archive_data::Union{Nothing,Vector{UInt8}}
+    data_refs::Union{Nothing,Vector{Ref}}
 
-    function ZipArchive(archive_ptr::Ptr{LibZipT}, source_ptr::Ptr{LibZipSourceT} = C_NULL)
+    function ZipArchive(
+        archive_ptr::Ptr{LibZipT}, 
+        source_ptr::Ptr{LibZipSourceT} = C_NULL,
+        data::Union{Nothing,Vector{UInt8}} = nothing
+    )
         libzip_source_keep(source_ptr)
         comment = unsafe_string(libzip_get_archive_comment(archive_ptr, C_NULL, 0))
-        zip = new(archive_ptr, source_ptr, comment, false)
+        zip = new(archive_ptr, source_ptr, comment, false, data, Ref[])
         finalizer(zip_discard, zip)
         return zip
     end
@@ -227,7 +235,7 @@ function ZipArchive(data::AbstractVector{UInt8}; flags::Int = LIBZIP_RDONLY)
     archive_ptr = libzip_open_from_source(source_ptr, flags, err_ptr)
     archive_ptr == C_NULL && throw(ZipError(err_ptr))
     zip_error_fini(err_ptr)
-    return ZipArchive(archive_ptr, source_ptr)
+    return ZipArchive(archive_ptr, source_ptr, data)
 end
 
 function ZipArchive(; flags::Int = LIBZIP_CREATE)
@@ -304,6 +312,8 @@ function zip_discard(zip::ZipArchive)
     if isopen(zip)
         libzip_source_free(zip.source_ptr)
         libzip_discard(zip.archive_ptr)
+        zip.archive_data = nothing
+        zip.data_refs = nothing
         zip.closed = true
     end
 end
@@ -520,6 +530,7 @@ function Base.write(
     flags::UInt32 = LIBZIP_FL_OVERWRITE,
 )
     check_closed(zip)
+    push!(zip.data_refs, Ref(data))
     status = libzip_file_add(zip.archive_ptr, filename, init_source(data), flags)
     status >= 0 || throw(ZipError(zip_error_code(zip)))
     return nothing
