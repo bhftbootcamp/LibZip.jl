@@ -6,7 +6,7 @@ using Test
 @testset "LibZip" verbose=true begin
     @testset "Test 1: ZipArchive open and write files" begin
         zip = ZipArchive(; flags = LIBZIP_CREATE)
-        write(zip, "dir/new_file.json", read("data/binance_spot_tickers.json"))
+        write(zip, "dir/new_file.json", read("data/spot_tickers.json"))
         zip_compress_file!(zip, "dir/new_file.json", LIBZIP_CM_DEFLATE; compression_level = 1)
         info = zip_get_file_info(zip, 0)
         @test unsafe_string(info.name) == "dir/new_file.json"
@@ -41,8 +41,8 @@ using Test
         @test_throws ZipError zip_open("data/simple_archive.zip"; flags = LIBZIP_EXCL)
         @test_throws ZipError ZipArchive(read("data/simple_archive.zip"); flags = LIBZIP_EXCL)
         zip = ZipArchive(; flags = LIBZIP_CREATE)
-        write(zip, "test.json", read("data/binance_spot_tickers.json"))
-        @test_throws ZipError write(zip, "test.json", read("data/binance_spot_tickers.json"); flags = LIBZIP_FL_ENC_GUESS)
+        write(zip, "test.json", read("data/spot_tickers.json"))
+        @test_throws ZipError write(zip, "test.json", read("data/spot_tickers.json"); flags = LIBZIP_FL_ENC_GUESS)
         @test_throws ZipError zip_compress_file!(zip, 0, LIBZIP_CM_DEFLATE64)
         @test_throws ZipError zip_encrypt_file!(zip, 0, "1234"; method = UInt16(2))
         @test_throws ZipError read(zip, 1)
