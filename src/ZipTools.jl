@@ -174,7 +174,8 @@ mutable struct ZipArchive
 
     function ZipArchive(archive_ptr::Ptr{LibZipT}, source_ptr::Ptr{LibZipSourceT} = C_NULL)
         libzip_source_keep(source_ptr)
-        comment = unsafe_string(libzip_get_archive_comment(archive_ptr, C_NULL, 0))
+        comment_ptr = libzip_get_archive_comment(archive_ptr, C_NULL, 0)
+        comment = comment_ptr == C_NULL ? "" : unsafe_string(comment_ptr)
         zip = new(archive_ptr, source_ptr, comment, Vector{UInt8}[], false)
         finalizer(zip_discard, zip)
         return zip
@@ -185,7 +186,7 @@ function init_source(data::AbstractVector{UInt8}, freep::Int = 0)
     err = LibZipErrorT()
     err_ptr = Ptr{LibZipErrorT}(pointer_from_objref(err))
     libzip_error_init(err_ptr)
-    ptr = libzip_source_buffer_create(data, length(data), freep, err_ptr)
+    ptr = GC.@preserve data libzip_source_buffer_create(pointer(data), length(data), freep, err_ptr)
     ptr == C_NULL && throw(ZipError(err_ptr))
     zip_error_fini(err_ptr)
     return ptr
@@ -195,7 +196,7 @@ function init_source(path::AbstractString, start::Int = 0, len::Int = -1)
     err = LibZipErrorT()
     err_ptr = Ptr{LibZipErrorT}(pointer_from_objref(err))
     libzip_error_init(err_ptr)
-    ptr = libzip_source_file_create(path, start, len, err_ptr)
+    ptr = GC.@preserve path libzip_source_file_create(pointer(path), start, len, err_ptr)
     ptr == C_NULL && throw(ZipError(err_ptr))
     zip_error_fini(err_ptr)
     return ptr
@@ -320,7 +321,7 @@ end
 """
     close(zip::ZipArchive)
 
-Commit cahnges and close a `zip` archive instance.
+Commit changes and close a `zip` archive instance.
 """
 function Base.close(zip::ZipArchive)
     if isopen(zip)
