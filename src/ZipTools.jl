@@ -15,6 +15,14 @@ export zip_open,
 using Dates
 using ..LibZip
 
+function zip_open end
+function zip_discard end
+function zip_compress_file! end
+function zip_encrypt_file! end
+function zip_default_password! end
+function zip_get_file_info end
+function zip_add_dir! end
+
 const COMPRESSION_METHODS = Dict(
     LIBZIP_CM_DEFAULT        => "DEFAULT",
     LIBZIP_CM_STORE          => "STORE",
@@ -166,7 +174,8 @@ mutable struct ZipArchive
 
     function ZipArchive(archive_ptr::Ptr{LibZipT}, source_ptr::Ptr{LibZipSourceT} = C_NULL)
         libzip_source_keep(source_ptr)
-        comment = unsafe_string(libzip_get_archive_comment(archive_ptr, C_NULL, 0))
+        comment_ptr = libzip_get_archive_comment(archive_ptr, C_NULL, 0)
+        comment = comment_ptr == C_NULL ? "" : unsafe_string(comment_ptr)
         zip = new(archive_ptr, source_ptr, comment, Vector{UInt8}[], false)
         finalizer(zip_discard, zip)
         return zip
@@ -177,7 +186,7 @@ function init_source(data::AbstractVector{UInt8}, freep::Int = 0)
     err = LibZipErrorT()
     err_ptr = Ptr{LibZipErrorT}(pointer_from_objref(err))
     libzip_error_init(err_ptr)
-    ptr = libzip_source_buffer_create(data, length(data), freep, err_ptr)
+    ptr = GC.@preserve data libzip_source_buffer_create(pointer(data), length(data), freep, err_ptr)
     ptr == C_NULL && throw(ZipError(err_ptr))
     zip_error_fini(err_ptr)
     return ptr
@@ -187,10 +196,35 @@ function init_source(path::AbstractString, start::Int = 0, len::Int = -1)
     err = LibZipErrorT()
     err_ptr = Ptr{LibZipErrorT}(pointer_from_objref(err))
     libzip_error_init(err_ptr)
-    ptr = libzip_source_file_create(path, start, len, err_ptr)
+    ptr = GC.@preserve path libzip_source_file_create(pointer(path), start, len, err_ptr)
     ptr == C_NULL && throw(ZipError(err_ptr))
     zip_error_fini(err_ptr)
     return ptr
+end
+
+function Base.show(io::IO, zip::ZipArchive)
+    println(io, " ZipArchive:")
+    if !isempty(zip.comment)
+        println(io, "    Comment: \"$(zip.comment)\"")
+    end
+    if zip.closed
+        println(io, "    🔒 Archive is closed — access is restricted.")
+    else
+        println(io, "    🔓 Archive is open and ready for use!")
+    end
+    if !zip.closed
+        if length(zip) == 0
+            println(io, "    📂 The archive is empty.")
+        else
+            println(io, "    📁 Files in archive:")
+            for i in 0:length(zip)-1
+                file_info = zip_get_file_info(zip, i)
+                println(io, "      📄 $(unsafe_string(file_info.name)): $(file_info.size) bytes")
+            end
+        end
+    else
+        println(io, "    Cannot display contents of a closed archive.")
+    end
 end
 
 """
@@ -287,7 +321,7 @@ end
 """
     close(zip::ZipArchive)
 
-Commit cahnges and close a `zip` archive instance.
+Commit changes and close a `zip` archive instance.
 """
 function Base.close(zip::ZipArchive)
     if isopen(zip)
@@ -538,33 +572,6 @@ Write the `zip` archive binary data as a file by `path`.
 function Base.write(path::AbstractString, zip::ZipArchive)
     @assert isopen(zip) "ZipArchive is closed."
     return write(path, read!(zip))
-end
-
-#__ Show
-
-function Base.show(io::IO, zip::ZipArchive)
-    println(io, " ZipArchive:")
-    if !isempty(zip.comment)
-        println(io, "    Comment: \"$(zip.comment)\"")
-    end
-    if zip.closed
-        println(io, "    🔒 Archive is closed — access is restricted.")
-    else
-        println(io, "    🔓 Archive is open and ready for use!")
-    end
-    if !zip.closed
-        if length(zip) == 0
-            println(io, "    📂 The archive is empty.")
-        else
-            println(io, "    📁 Files in archive:")
-            for i in 0:length(zip)-1
-                file_info = zip_get_file_info(zip, i)
-                println(io, "      📄 $(unsafe_string(file_info.name)): $(file_info.size) bytes")
-            end
-        end
-    else
-        println(io, "    Cannot display contents of a closed archive.")
-    end
 end
 
 end
