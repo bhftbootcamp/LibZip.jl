@@ -15,6 +15,14 @@ export zip_open,
 using Dates
 using ..LibZip
 
+function zip_open end
+function zip_discard end
+function zip_compress_file! end
+function zip_encrypt_file! end
+function zip_default_password! end
+function zip_get_file_info end
+function zip_add_dir! end
+
 const COMPRESSION_METHODS = Dict(
     LIBZIP_CM_DEFAULT        => "DEFAULT",
     LIBZIP_CM_STORE          => "STORE",
@@ -191,6 +199,31 @@ function init_source(path::AbstractString, start::Int = 0, len::Int = -1)
     ptr == C_NULL && throw(ZipError(err_ptr))
     zip_error_fini(err_ptr)
     return ptr
+end
+
+function Base.show(io::IO, zip::ZipArchive)
+    println(io, " ZipArchive:")
+    if !isempty(zip.comment)
+        println(io, "    Comment: \"$(zip.comment)\"")
+    end
+    if zip.closed
+        println(io, "    🔒 Archive is closed — access is restricted.")
+    else
+        println(io, "    🔓 Archive is open and ready for use!")
+    end
+    if !zip.closed
+        if length(zip) == 0
+            println(io, "    📂 The archive is empty.")
+        else
+            println(io, "    📁 Files in archive:")
+            for i in 0:length(zip)-1
+                file_info = zip_get_file_info(zip, i)
+                println(io, "      📄 $(unsafe_string(file_info.name)): $(file_info.size) bytes")
+            end
+        end
+    else
+        println(io, "    Cannot display contents of a closed archive.")
+    end
 end
 
 """
@@ -538,33 +571,6 @@ Write the `zip` archive binary data as a file by `path`.
 function Base.write(path::AbstractString, zip::ZipArchive)
     @assert isopen(zip) "ZipArchive is closed."
     return write(path, read!(zip))
-end
-
-#__ Show
-
-function Base.show(io::IO, zip::ZipArchive)
-    println(io, " ZipArchive:")
-    if !isempty(zip.comment)
-        println(io, "    Comment: \"$(zip.comment)\"")
-    end
-    if zip.closed
-        println(io, "    🔒 Archive is closed — access is restricted.")
-    else
-        println(io, "    🔓 Archive is open and ready for use!")
-    end
-    if !zip.closed
-        if length(zip) == 0
-            println(io, "    📂 The archive is empty.")
-        else
-            println(io, "    📁 Files in archive:")
-            for i in 0:length(zip)-1
-                file_info = zip_get_file_info(zip, i)
-                println(io, "      📄 $(unsafe_string(file_info.name)): $(file_info.size) bytes")
-            end
-        end
-    else
-        println(io, "    Cannot display contents of a closed archive.")
-    end
 end
 
 end
