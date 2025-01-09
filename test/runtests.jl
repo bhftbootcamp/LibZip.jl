@@ -3,7 +3,7 @@
 using LibZip
 using Test
 
-@testset "LibZip" verbose=true begin
+@testset "LibZip" verbose = true begin
     @testset "Test 1: ZipArchive open and write files" begin
         zip = ZipArchive(; flags = LIBZIP_CREATE)
         write(zip, "dir/new_file.json", read("data/spot_tickers.json"))
