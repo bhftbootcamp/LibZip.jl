@@ -551,9 +551,8 @@ function Base.read!(zip::ZipArchive)
         libzip_stat_init(info_ptr)
         libzip_source_stat(zip.source_ptr, info_ptr) < 0 && throw(ZipError(source_error_code(zip)))
         libzip_source_open(zip.source_ptr) < 0 && throw(ZipError(source_error_code(zip)))
-        len = info.size
-        buffer = Vector{UInt8}(undef, len)
-        libzip_source_read(zip.source_ptr, buffer, len) < 0 && throw(ZipError(source_error_code(zip)))
+        buffer = Vector{UInt8}(undef, info.size)
+        libzip_source_read(zip.source_ptr, buffer, info.size) < 0 && throw(ZipError(source_error_code(zip)))
         libzip_source_close(zip.source_ptr)
         return buffer
     end
