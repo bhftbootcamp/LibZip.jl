@@ -300,6 +300,19 @@ end
 Base.isopen(zip::ZipArchive) = !zip.closed
 Base.bind(zip::ZipArchive, x::AbstractVector{UInt8}) = push!(zip.source_data, x)
 
+# TODO: Revisit this code after issue #479 is resolved: https://github.com/nih-at/libzip/issues/479
+function _zip_commit(f::Function, zip::ZipArchive)
+    status = libzip_close(zip.archive_ptr)
+    iszero(status) || throw(ZipError(zip_error_code(zip)))
+    try
+        f(zip)
+    finally
+        libzip_source_free(zip.source_ptr)
+        empty!(zip.source_data)
+        zip.closed = true
+    end
+end
+
 """
     zip_open(path::String; flags::Int = LIBZIP_RDONLY) -> ZipArchive
 
@@ -325,6 +338,7 @@ Commit changes and close a `zip` archive instance.
 """
 function Base.close(zip::ZipArchive)
     if isopen(zip)
+        libzip_source_free(zip.source_ptr)
         status = libzip_close(zip.archive_ptr)
         iszero(status) || throw(ZipError(zip_error_code(zip)))
         empty!(zip.source_data)
@@ -531,17 +545,18 @@ Read binary data and then close the `zip` archive.
 """
 function Base.read!(zip::ZipArchive)
     @assert isopen(zip) "ZipArchive is closed."
-    close(zip)
-    info = LibZipStatT()
-    info_ptr = pointer_from_objref(info)
-    libzip_stat_init(info_ptr)
-    libzip_source_stat(zip.source_ptr, info_ptr) < 0 && throw(ZipError(source_error_code(zip)))
-    libzip_source_open(zip.source_ptr) < 0 && throw(ZipError(source_error_code(zip)))
-    len = info.size
-    buffer = Vector{UInt8}(undef, len)
-    libzip_source_read(zip.source_ptr, buffer, len) < 0 && throw(ZipError(source_error_code(zip)))
-    libzip_source_close(zip.source_ptr)
-    return buffer
+    _zip_commit(zip) do zip
+        info = LibZipStatT()
+        info_ptr = pointer_from_objref(info)
+        libzip_stat_init(info_ptr)
+        libzip_source_stat(zip.source_ptr, info_ptr) < 0 && throw(ZipError(source_error_code(zip)))
+        libzip_source_open(zip.source_ptr) < 0 && throw(ZipError(source_error_code(zip)))
+        len = info.size
+        buffer = Vector{UInt8}(undef, len)
+        libzip_source_read(zip.source_ptr, buffer, len) < 0 && throw(ZipError(source_error_code(zip)))
+        libzip_source_close(zip.source_ptr)
+        return buffer
+    end
 end
 
 """
