@@ -545,15 +545,15 @@ Read binary data and then close the `zip` archive.
 """
 function Base.read!(zip::ZipArchive)
     @assert isopen(zip) "ZipArchive is closed."
-    _zip_commit(zip) do zip
+    _zip_commit(zip) do cmtd_zip
         info = LibZipStatT()
         info_ptr = pointer_from_objref(info)
         libzip_stat_init(info_ptr)
-        libzip_source_stat(zip.source_ptr, info_ptr) < 0 && throw(ZipError(source_error_code(zip)))
-        libzip_source_open(zip.source_ptr) < 0 && throw(ZipError(source_error_code(zip)))
+        libzip_source_stat(cmtd_zip.source_ptr, info_ptr) < 0 && throw(ZipError(source_error_code(cmtd_zip)))
+        libzip_source_open(cmtd_zip.source_ptr) < 0 && throw(ZipError(source_error_code(cmtd_zip)))
         buffer = Vector{UInt8}(undef, info.size)
-        libzip_source_read(zip.source_ptr, buffer, info.size) < 0 && throw(ZipError(source_error_code(zip)))
-        libzip_source_close(zip.source_ptr)
+        libzip_source_read(cmtd_zip.source_ptr, buffer, info.size) < 0 && throw(ZipError(source_error_code(cmtd_zip)))
+        libzip_source_close(cmtd_zip.source_ptr)
         return buffer
     end
 end
