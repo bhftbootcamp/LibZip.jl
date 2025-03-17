@@ -75,3 +75,8 @@ zip_compress_file!(archive, "new_file.txt", LIBZIP_CM_DEFLATE; compression_level
 # Close the archive after modification
 close(archive)
 ```
+
+## Useful Links
+
+- [libzip](https://github.com/nih-at/libzip) – Official library repository.
+- [libzip_jll.jl](https://github.com/JuliaBinaryWrappers/libzip_jll.jl) – Julia wrapper for libzip.
