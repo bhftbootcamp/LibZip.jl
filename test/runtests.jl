@@ -55,11 +55,9 @@ using Test
         zip1 = ZipArchive(; flags = LIBZIP_CREATE)
         write(zip1, "text.txt", b"text")
         buffer = read!(zip1)
-        @test !isopen(zip1)
-
-        zip2 = ZipArchive(buffer; flags = LIBZIP_CREATE)
-        @test length(zip2) == 1
-        @test_nowarn write(zip2, "text2.txt", b"text2")
-        @test length(zip2) == 2
+        @test isopen(zip1)
+        @test length(zip1) == 1
+        @test_nowarn write(zip1, "text2.txt", b"text2")
+        @test length(zip1) == 2
     end
 end

@@ -300,16 +300,25 @@ end
 Base.isopen(zip::ZipArchive) = !zip.closed
 Base.bind(zip::ZipArchive, x::AbstractVector{UInt8}) = push!(zip.source_data, x)
 
-# TODO: Revisit this code after issue #479 is resolved: https://github.com/nih-at/libzip/issues/479
+# Using zip_close + zip_open as recommended in https://github.com/nih-at/libzip/issues/479#issuecomment-2602641482
 function _zip_commit(f::Function, zip::ZipArchive)
     status = libzip_close(zip.archive_ptr)
     iszero(status) || throw(ZipError(zip_error_code(zip)))
+    buffer = nothing
     try
-        f(zip)
+        buffer = f(zip)
     finally
         libzip_source_free(zip.source_ptr)
-        empty!(zip.source_data)
-        zip.closed = true
+        err = LibZipErrorT()
+        err_ptr = Ptr{LibZipErrorT}(pointer_from_objref(err))
+        libzip_error_init(err_ptr)
+        source_ptr = init_source(buffer)
+        archive_ptr = libzip_open_from_source(source_ptr, LIBZIP_CREATE, err_ptr)
+        archive_ptr == C_NULL && throw(ZipError(err_ptr))
+        libzip_source_keep(source_ptr)
+        zip.archive_ptr = archive_ptr
+        zip.source_ptr = source_ptr
+        zip_error_fini(err_ptr)
     end
 end
 
