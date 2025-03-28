@@ -552,7 +552,7 @@ end
 """
     read!(zip::ZipArchive) -> Vector{UInt8}
 
-Read binary data and then close the `zip` archive.
+Read binary data of the entire `zip` archive.
 """
 function Base.read!(zip::ZipArchive)
     @assert isopen(zip) "ZipArchive is closed."
