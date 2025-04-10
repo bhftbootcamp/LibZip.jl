@@ -57,7 +57,7 @@ const ENCRYPTION_METHODS = Dict(
 )
 
 struct ZipError <: Exception
-    code::Int
+    code::Int32
     message::String
 
     function ZipError(err_ref::Ref{LibZipErrorT})
@@ -66,7 +66,7 @@ struct ZipError <: Exception
         return new(code, message)
     end
 
-    function ZipError(code::Int)
+    function ZipError(code::Int32)
         _zip_error() do err_ref
             libzip_error_init_with_code(err_ref, code)
             return ZipError(err_ref)
