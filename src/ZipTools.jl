@@ -57,20 +57,20 @@ const ENCRYPTION_METHODS = Dict(
 )
 
 struct ZipError <: Exception
-    code::Int
+    code::Int32
     message::String
 
-    function ZipError(err_ptr::Ptr{LibZipErrorT})
-        code = libzip_error_code_zip(err_ptr)
-        message = unsafe_string(libzip_error_strerror(err_ptr))
+    function ZipError(err_ref::Ref{LibZipErrorT})
+        code = libzip_error_code_zip(err_ref)
+        message = unsafe_string(libzip_error_strerror(err_ref))
         return new(code, message)
     end
 
-    function ZipError(code::Int)
-        err = LibZipErrorT()
-        err_ptr = Ptr{LibZipErrorT}(pointer_from_objref(err))
-        libzip_error_init_with_code(err_ptr, code)
-        return ZipError(err_ptr)
+    function ZipError(code::Int32)
+        _zip_error() do err_ref
+            libzip_error_init_with_code(err_ref, code)
+            return ZipError(err_ref)
+        end
     end
 end
 
@@ -183,23 +183,19 @@ mutable struct ZipArchive
 end
 
 function init_source(data::AbstractVector{UInt8}, freep::Int = 0)
-    err = LibZipErrorT()
-    err_ptr = Ptr{LibZipErrorT}(pointer_from_objref(err))
-    libzip_error_init(err_ptr)
-    ptr = GC.@preserve data libzip_source_buffer_create(pointer(data), length(data), freep, err_ptr)
-    ptr == C_NULL && throw(ZipError(err_ptr))
-    zip_error_fini(err_ptr)
-    return ptr
+    _zip_error() do err_ref
+        ptr = GC.@preserve data libzip_source_buffer_create(pointer(data), length(data), freep, err_ref)
+        ptr == C_NULL && throw(ZipError(err_ref))
+        return ptr
+    end
 end
 
 function init_source(path::AbstractString, start::Int = 0, len::Int = -1)
-    err = LibZipErrorT()
-    err_ptr = Ptr{LibZipErrorT}(pointer_from_objref(err))
-    libzip_error_init(err_ptr)
-    ptr = GC.@preserve path libzip_source_file_create(pointer(path), start, len, err_ptr)
-    ptr == C_NULL && throw(ZipError(err_ptr))
-    zip_error_fini(err_ptr)
-    return ptr
+    _zip_error() do err_ref
+        ptr = GC.@preserve path libzip_source_file_create(pointer(path), start, len, err_ref)
+        ptr == C_NULL && throw(ZipError(err_ref))
+        return ptr
+    end
 end
 
 function Base.show(io::IO, zip::ZipArchive)
@@ -258,16 +254,14 @@ julia> ZipArchive(zip_file)
 ZipArchive()
 
 function ZipArchive(data::AbstractVector{UInt8}; flags::Int = LIBZIP_RDONLY)
-    err = LibZipErrorT()
-    err_ptr = Ptr{LibZipErrorT}(pointer_from_objref(err))
-    libzip_error_init(err_ptr)
-    source_ptr = init_source(data)
-    archive_ptr = libzip_open_from_source(source_ptr, flags, err_ptr)
-    archive_ptr == C_NULL && throw(ZipError(err_ptr))
-    zip_error_fini(err_ptr)
-    zip = ZipArchive(archive_ptr, source_ptr)
-    bind(zip, data)
-    return zip
+    _zip_error() do err_ref
+        source_ptr = init_source(data)
+        archive_ptr = libzip_open_from_source(source_ptr, flags, err_ref)
+        archive_ptr == C_NULL && throw(ZipError(err_ref))
+        zip = ZipArchive(archive_ptr, source_ptr)
+        bind(zip, data)
+        return zip
+    end
 end
 
 function ZipArchive(; flags::Int = LIBZIP_CREATE)
@@ -286,13 +280,13 @@ function locate_file(zip::ZipArchive, filename::AbstractString, flags::UInt32=UI
 end
 
 function zip_error_code(zip::ZipArchive)
-    err_ptr = libzip_get_error(zip.archive_ptr)
-    return libzip_error_code_zip(err_ptr)
+    err_ref = libzip_get_error(zip.archive_ptr)
+    return libzip_error_code_zip(err_ref)
 end
 
 function source_error_code(zip::ZipArchive)
-    err_ptr = libzip_source_error(zip.source_ptr)
-    return libzip_error_code_zip(err_ptr)
+    err_ref = libzip_source_error(zip.source_ptr)
+    return libzip_error_code_zip(err_ref)
 end
 
 #__ Tools
@@ -300,16 +294,33 @@ end
 Base.isopen(zip::ZipArchive) = !zip.closed
 Base.bind(zip::ZipArchive, x::AbstractVector{UInt8}) = push!(zip.source_data, x)
 
-# TODO: Revisit this code after issue #479 is resolved: https://github.com/nih-at/libzip/issues/479
+# Using zip_close + zip_open as recommended in https://github.com/nih-at/libzip/issues/479#issuecomment-2602641482
 function _zip_commit(f::Function, zip::ZipArchive)
     status = libzip_close(zip.archive_ptr)
     iszero(status) || throw(ZipError(zip_error_code(zip)))
+    buffer = nothing
     try
-        f(zip)
+        buffer = f(zip)
     finally
         libzip_source_free(zip.source_ptr)
-        empty!(zip.source_data)
-        zip.closed = true
+        _zip_error() do err_ref
+            source_ptr = init_source(buffer)
+            archive_ptr = libzip_open_from_source(source_ptr, LIBZIP_CREATE, err_ref)
+            archive_ptr == C_NULL && throw(ZipError(err_ref))
+            libzip_source_keep(source_ptr)
+            zip.archive_ptr = archive_ptr
+            zip.source_ptr = source_ptr
+        end
+    end
+end
+
+function _zip_error(f::Function)
+    err = Ref{LibZipErrorT}(LibZipErrorT())
+    libzip_error_init(err)
+    try
+      return f(err)
+    finally
+        zip_error_fini(err)
     end
 end
 
@@ -321,14 +332,12 @@ Open a zip archive file by its `path` with specified `flags`.
 See also [`Open flags`](@ref open_flags) section.
 """
 function zip_open(path::AbstractString; flags::Int = LIBZIP_RDONLY)
-    err = LibZipErrorT()
-    err_ptr = Ptr{LibZipErrorT}(pointer_from_objref(err))
-    libzip_error_init(err_ptr)
-    source_ptr = init_source(path)
-    archive_ptr = libzip_open_from_source(source_ptr, flags, err_ptr)
-    archive_ptr == C_NULL && throw(ZipError(err_ptr))
-    zip_error_fini(err_ptr)
-    return ZipArchive(archive_ptr, source_ptr)
+    _zip_error() do err_ref
+        source_ptr = init_source(path)
+        archive_ptr = libzip_open_from_source(source_ptr, flags, err_ref)
+        archive_ptr == C_NULL && throw(ZipError(err_ref))
+        return ZipArchive(archive_ptr, source_ptr)
+    end
 end
 
 """
@@ -541,7 +550,7 @@ end
 """
     read!(zip::ZipArchive) -> Vector{UInt8}
 
-Read binary data and then close the `zip` archive.
+Read binary data of the entire `zip` archive.
 """
 function Base.read!(zip::ZipArchive)
     @assert isopen(zip) "ZipArchive is closed."

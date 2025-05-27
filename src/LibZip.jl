@@ -319,24 +319,24 @@ struct LibZipSourceT end
 struct LibZipFileT end
 
 mutable struct LibZipErrorT
-    zip_err::Int64
-    sys_err::Int64
+    zip_err::Cint
+    sys_err::Cint
     str::Ptr{UInt8}
 
     LibZipErrorT() = new(0, 0, Ptr{UInt8}())
 end
 
 mutable struct LibZipStatT
-    valid::Int64
+    valid::UInt64
     name::Ptr{UInt8}
-    index::Int64
-    size::Int64
-    comp_size::Int64
-    time::Int64
+    index::UInt64
+    size::UInt64
+    comp_size::UInt64
+    time::Clong
     crc::UInt32
     comp_method::UInt16
     encryption_method::UInt16
-    flags::Int32
+    flags::UInt32
 
     LibZipStatT() = new(0, Ptr{UInt8}(), 0, 0, 0, 0, 0, 0, 0, 0)
 end
@@ -366,15 +366,15 @@ end
 #__ Source
 
 function libzip_source_buffer(archive, data, len, freep)
-    return ccall((:zip_source_buffer, libzip), Ptr{LibZipSourceT}, (Ptr{LibZipT}, Ptr{Cvoid}, Csize_t, Cint,), archive, data, len, freep)
+    return ccall((:zip_source_buffer, libzip), Ptr{LibZipSourceT}, (Ptr{LibZipT}, Ptr{Cvoid}, UInt64, Cint,), archive, data, len, freep)
 end
 
 function libzip_source_buffer_create(data, len, freep, error)
-    return ccall((:zip_source_buffer_create, libzip), Ptr{LibZipSourceT}, (Ptr{UInt8}, Csize_t, Cint, Ptr{LibZipErrorT}), data, len, freep, error)
+    return ccall((:zip_source_buffer_create, libzip), Ptr{LibZipSourceT}, (Ptr{UInt8}, UInt64, Cint, Ptr{LibZipErrorT}), data, len, freep, error)
 end
 
 function libzip_source_file_create(fname, start, len, error)
-    return ccall((:zip_source_file_create, libzip), Ptr{LibZipSourceT}, (Ptr{UInt8}, Csize_t, Cssize_t, Ptr{LibZipErrorT}), fname, start, len, error)
+    return ccall((:zip_source_file_create, libzip), Ptr{LibZipSourceT}, (Ptr{UInt8}, UInt64, Cssize_t, Ptr{LibZipErrorT}), fname, start, len, error)
 end
 
 function libzip_source_keep(source)
@@ -382,19 +382,19 @@ function libzip_source_keep(source)
 end
 
 function libzip_source_stat(source, sb)
-    return ccall((:zip_source_stat, libzip), Int64, (Ptr{LibZipSourceT}, Ptr{LibZipStatT}), source, sb)
+    return ccall((:zip_source_stat, libzip), Cint, (Ptr{LibZipSourceT}, Ptr{LibZipStatT}), source, sb)
 end
 
 function libzip_source_open(source)
-    return ccall((:zip_source_open, libzip), Int64, (Ptr{LibZipSourceT},), source)
+    return ccall((:zip_source_open, libzip), Cint, (Ptr{LibZipSourceT},), source)
 end
 
 function libzip_source_read(source, data, len)
-    return ccall((:zip_source_read, libzip), Int64, (Ptr{LibZipSourceT}, Ptr{UInt8}, Csize_t), source, data, len)
+    return ccall((:zip_source_read, libzip), Int64, (Ptr{LibZipSourceT}, Ptr{UInt8}, UInt64), source, data, len)
 end
 
 function libzip_source_close(source)
-    return ccall((:zip_source_close, libzip), Int64, (Ptr{LibZipSourceT},), source)
+    return ccall((:zip_source_close, libzip), Cint, (Ptr{LibZipSourceT},), source)
 end
 
 function libzip_source_free(source)
@@ -412,47 +412,47 @@ function libzip_file_add(archive, name, source, flags)
 end
 
 function libzip_file_replace(archive, index, source, flags)
-    return ccall((:zip_file_replace, libzip), Int64, (Ptr{LibZipT}, Csize_t, Ptr{LibZipSourceT}, Cuint), archive, index, source, flags)
+    return ccall((:zip_file_replace, libzip), Cint, (Ptr{LibZipT}, UInt64, Ptr{LibZipSourceT}, Cuint), archive, index, source, flags)
 end
 
 function libzip_set_file_compression(archive, index, comp, comp_flags)
-    return ccall((:zip_set_file_compression, libzip), Int64, (Ptr{LibZipT}, Csize_t, Cint, Cuint), archive, index, comp, comp_flags)
+    return ccall((:zip_set_file_compression, libzip), Cint, (Ptr{LibZipT}, UInt64, Cint, Cuint), archive, index, comp, comp_flags)
 end
 
 function libzip_file_set_encryption(archive, index, method, password)
-    return ccall((:zip_file_set_encryption, libzip), Int64, (Ptr{LibZipT}, Csize_t, Cushort, Ptr{UInt8}), archive, index, method, password)
+    return ccall((:zip_file_set_encryption, libzip), Cint, (Ptr{LibZipT}, UInt64, Cushort, Ptr{UInt8}), archive, index, method, password)
 end
 
 function libzip_file_set_comment(archive, index, comment, len, flags)
-    return ccall((:zip_file_set_comment, libzip), Int64, (Ptr{LibZipT}, Csize_t, Ptr{UInt8}, Cushort, Cuint), archive, index, comment, len, flags)
+    return ccall((:zip_file_set_comment, libzip), Cint, (Ptr{LibZipT}, UInt64, Ptr{UInt8}, Cushort, Cuint), archive, index, comment, len, flags)
 end
 
 function libzip_file_get_comment(archive, index, lenp, flags)
-    return ccall((:zip_file_get_comment, libzip), Ptr{UInt8}, (Ptr{LibZipT}, Csize_t, Ptr{Cint}, Int64), archive, index, lenp, flags)
+    return ccall((:zip_file_get_comment, libzip), Ptr{UInt8}, (Ptr{LibZipT}, UInt64, Ptr{Cint}, Int64), archive, index, lenp, flags)
 end
 
 function libzip_file_set_dostime(archive, index, dostime, dosdate, flags)
-    return ccall((:zip_file_set_dostime, libzip), Int64, (Ptr{LibZipT}, Csize_t, Cushort, Cushort, Cuint), archive, index, dostime, dosdate, flags)
+    return ccall((:zip_file_set_dostime, libzip), Cint, (Ptr{LibZipT}, UInt64, Cushort, Cushort, Cuint), archive, index, dostime, dosdate, flags)
 end
 
 function libzip_file_set_mtime(archive, index, mtime, flags)
-    return ccall((:zip_file_set_mtime, libzip), Int64, (Ptr{LibZipT}, Csize_t, Clonglong, Cuint), archive, index, mtime, flags)
+    return ccall((:zip_file_set_mtime, libzip), Cint, (Ptr{LibZipT}, UInt64, Clonglong, Cuint), archive, index, mtime, flags)
 end
 
 function libzip_file_set_external_attributes(archive, index, flags, opsys, attributes)
-    return ccall((:zip_file_set_external_attributes, libzip), Int64, (Ptr{LibZipT}, Csize_t, Cuint, Cuchar, Cuint), archive, index, flags, opsys, attributes)
+    return ccall((:zip_file_set_external_attributes, libzip), Cint, (Ptr{LibZipT}, UInt64, Cuint, Cuchar, Cuint), archive, index, flags, opsys, attributes)
 end
 
 function libzip_file_get_external_attributes(archive, index, flags, opsys, attributes)
-    return ccall((:zip_file_get_external_attributes, libzip), Int64, (Ptr{LibZipT}, Csize_t, Cuint, Ptr{Cuchar}, Ptr{Cuint}), archive, index, flags, opsys, attributes)
+    return ccall((:zip_file_get_external_attributes, libzip), Cint, (Ptr{LibZipT}, UInt64, Cuint, Ptr{Cuchar}, Ptr{Cuint}), archive, index, flags, opsys, attributes)
 end
 
 function libzip_rename(archive, index, name)
-    return ccall((:zip_rename, libzip), Int64, (Ptr{LibZipT}, Csize_t, Ptr{UInt8}), archive, index, name)
+    return ccall((:zip_rename, libzip), Cint, (Ptr{LibZipT}, UInt64, Ptr{UInt8}), archive, index, name)
 end
 
 function libzip_delete(archive, index)
-    return ccall((:zip_delete, libzip), Int64, (Ptr{LibZipT}, Csize_t), archive, index)
+    return ccall((:zip_delete, libzip), Cint, (Ptr{LibZipT}, UInt64), archive, index)
 end
 
 #__ Miscellaneous
@@ -462,11 +462,11 @@ function libzip_get_num_entries(archive, flags)
 end
 
 function libzip_set_default_password(archive, password)
-    return ccall((:zip_set_default_password, libzip), Int64, (Ptr{LibZipT}, Ptr{UInt8}), archive, password)
+    return ccall((:zip_set_default_password, libzip), Cint, (Ptr{LibZipT}, Ptr{UInt8}), archive, password)
 end
 
 function libzip_get_name(archive, index, flags)
-    return ccall((:zip_get_name, libzip), Ptr{UInt8}, (Ptr{LibZipT}, Csize_t, Cuint), archive, index, flags)
+    return ccall((:zip_get_name, libzip), Ptr{UInt8}, (Ptr{LibZipT}, UInt64, Cuint), archive, index, flags)
 end
 
 function libzip_stat_init(sb)
@@ -474,11 +474,11 @@ function libzip_stat_init(sb)
 end
 
 function libzip_stat(archive, fname, flags, sb)
-    return ccall((:zip_stat, libzip), Int64, (Ptr{LibZipT}, Ptr{UInt8}, Cuint, Ptr{LibZipStatT}), archive, fname, flags, sb)
+    return ccall((:zip_stat, libzip), Cint, (Ptr{LibZipT}, Ptr{UInt8}, Cuint, Ptr{LibZipStatT}), archive, fname, flags, sb)
 end
 
 function libzip_stat_index(archive, index, flags, sb)
-    return ccall((:zip_stat_index, libzip), Int64, (Ptr{LibZipT}, Csize_t, Cuint, Ptr{LibZipStatT}), archive, index, flags, sb)
+    return ccall((:zip_stat_index, libzip), Cint, (Ptr{LibZipT}, UInt64, Cuint, Ptr{LibZipStatT}), archive, index, flags, sb)
 end
 
 function libzip_name_locate(archive, fname, flags)
@@ -486,7 +486,7 @@ function libzip_name_locate(archive, fname, flags)
 end
 
 function libzip_set_archive_comment(archive, comment, len)
-    return ccall((:zip_set_archive_comment, libzip), Int64, (Ptr{LibZipT}, Ptr{UInt8}, Cint), archive, comment, len)
+    return ccall((:zip_set_archive_comment, libzip), Cint, (Ptr{LibZipT}, Ptr{UInt8}, Cint), archive, comment, len)
 end
 
 function libzip_get_archive_comment(archive, lenp, flags)
@@ -494,11 +494,11 @@ function libzip_get_archive_comment(archive, lenp, flags)
 end
 
 function libzip_set_archive_flag(archive, flag, value)
-    return ccall((:zip_set_archive_flag, libzip), Int64, (Ptr{LibZipT}, Cuint, Cint), archive, flag, value)
+    return ccall((:zip_set_archive_flag, libzip), Cint, (Ptr{LibZipT}, Cuint, Cint), archive, flag, value)
 end
 
 function libzip_get_archive_flag(archive, flag, flags)
-    return ccall((:zip_get_archive_flag, libzip), Int64, (Ptr{LibZipT}, Cuint, Cuint), archive, flag, flags)
+    return ccall((:zip_get_archive_flag, libzip), Cint, (Ptr{LibZipT}, Cuint, Cuint), archive, flag, flags)
 end
 
 #__ Read Files
@@ -508,7 +508,7 @@ function libzip_fopen(archive, fname, flags)
 end
 
 function libzip_fopen_index(archive, index, flags)
-    return ccall((:zip_fopen_index, libzip), Ptr{LibZipFileT}, (Ptr{LibZipT}, Csize_t, Cuint), archive, index, flags)
+    return ccall((:zip_fopen_index, libzip), Ptr{LibZipFileT}, (Ptr{LibZipT}, UInt64, Cuint), archive, index, flags)
 end
 
 function libzip_fopen_encrypted(archive, fname, flags, password)
@@ -516,7 +516,7 @@ function libzip_fopen_encrypted(archive, fname, flags, password)
 end
 
 function libzip_fopen_index_encrypted(archive, index, flags, password)
-    return ccall((:zip_fopen_index_encrypted, libzip), Ptr{LibZipFileT}, (Ptr{LibZipT}, Csize_t, Cuint, Ptr{UInt8}), archive, index, flags, password)
+    return ccall((:zip_fopen_index_encrypted, libzip), Ptr{LibZipFileT}, (Ptr{LibZipT}, UInt64, Cuint, Ptr{UInt8}), archive, index, flags, password)
 end
 
 function libzip_fread(file, buf, nbytes)
@@ -524,21 +524,21 @@ function libzip_fread(file, buf, nbytes)
 end
 
 function libzip_fclose(file)
-    return ccall((:zip_fclose, libzip), Int64, (Ptr{LibZipFileT},), file)
+    return ccall((:zip_fclose, libzip), Cint, (Ptr{LibZipFileT},), file)
 end
 
 #__ Revert Changes
 
 function libzip_unchange(archive, index)
-    return ccall((:zip_unchange, libzip), Int64, (Ptr{LibZipT}, Csize_t), archive, index)
+    return ccall((:zip_unchange, libzip), Cint, (Ptr{LibZipT}, UInt64), archive, index)
 end
 
 function libzip_unchange_all(archive)
-    return ccall((:zip_unchange_all, libzip), Int64, (Ptr{LibZipT},), archive)
+    return ccall((:zip_unchange_all, libzip), Cint, (Ptr{LibZipT},), archive)
 end
 
 function libzip_unchange_archive(archive)
-    return ccall((:zip_unchange_archive, libzip), Int64, (Ptr{LibZipT},), archive)
+    return ccall((:zip_unchange_archive, libzip), Cint, (Ptr{LibZipT},), archive)
 end
 
 #__ Error Handling
@@ -556,11 +556,11 @@ function libzip_get_error(archive)
 end
 
 function libzip_error_code_zip(ze)
-    return ccall((:zip_error_code_zip, libzip), Int64, (Ptr{LibZipErrorT},), ze)
+    return ccall((:zip_error_code_zip, libzip), Cint, (Ptr{LibZipErrorT},), ze)
 end
 
 function libzip_error_code_system(ze)
-    return ccall((:zip_error_code_system, libzip), Int64, (Ptr{LibZipErrorT},), ze)
+    return ccall((:zip_error_code_system, libzip), Cint, (Ptr{LibZipErrorT},), ze)
 end
 
 function libzip_error_strerror(ze)
