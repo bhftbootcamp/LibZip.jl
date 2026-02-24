@@ -314,6 +314,9 @@ const LIBZIP_AFL_CREATE_OR_KEEP_FILE_FOR_EMPTY_ARCHIVE = UInt32(16) # don't remo
 const LIBZIP_LENGTH_TO_END    = 0
 const LIBZIP_LENGTH_UNCHECKED = -2 # only supported by zip_source_file and its variants
 
+# time_t: long on Unix, __time64_t (Int64) on Windows
+const CTimeT = Sys.iswindows() ? Int64 : Clong
+
 struct LibZipT end
 struct LibZipSourceT end
 struct LibZipFileT end
@@ -332,7 +335,7 @@ mutable struct LibZipStatT
     index::UInt64
     size::UInt64
     comp_size::UInt64
-    time::Clong
+    time::CTimeT
     crc::UInt32
     comp_method::UInt16
     encryption_method::UInt16
@@ -348,7 +351,7 @@ end
 #__ Open/Close Archive
 
 function libzip_open(path, flags, errorp)
-    return ccall((:zip_open, libzip), Ptr{LibZipT}, (Ptr{UInt8}, Cint, Ptr{Clonglong}), path, flags, errorp)
+    return ccall((:zip_open, libzip), Ptr{LibZipT}, (Ptr{UInt8}, Cint, Ptr{Cint}), path, flags, errorp)
 end
 
 function libzip_open_from_source(zs, flags, ze)
@@ -374,7 +377,7 @@ function libzip_source_buffer_create(data, len, freep, error)
 end
 
 function libzip_source_file_create(fname, start, len, error)
-    return ccall((:zip_source_file_create, libzip), Ptr{LibZipSourceT}, (Ptr{UInt8}, UInt64, Cssize_t, Ptr{LibZipErrorT}), fname, start, len, error)
+    return ccall((:zip_source_file_create, libzip), Ptr{LibZipSourceT}, (Ptr{UInt8}, UInt64, Int64, Ptr{LibZipErrorT}), fname, start, len, error)
 end
 
 function libzip_source_keep(source)
@@ -428,7 +431,7 @@ function libzip_file_set_comment(archive, index, comment, len, flags)
 end
 
 function libzip_file_get_comment(archive, index, lenp, flags)
-    return ccall((:zip_file_get_comment, libzip), Ptr{UInt8}, (Ptr{LibZipT}, UInt64, Ptr{Cint}, Int64), archive, index, lenp, flags)
+    return ccall((:zip_file_get_comment, libzip), Ptr{UInt8}, (Ptr{LibZipT}, UInt64, Ptr{UInt32}, UInt32), archive, index, lenp, flags)
 end
 
 function libzip_file_set_dostime(archive, index, dostime, dosdate, flags)
@@ -436,7 +439,7 @@ function libzip_file_set_dostime(archive, index, dostime, dosdate, flags)
 end
 
 function libzip_file_set_mtime(archive, index, mtime, flags)
-    return ccall((:zip_file_set_mtime, libzip), Cint, (Ptr{LibZipT}, UInt64, Clonglong, Cuint), archive, index, mtime, flags)
+    return ccall((:zip_file_set_mtime, libzip), Cint, (Ptr{LibZipT}, UInt64, CTimeT, Cuint), archive, index, mtime, flags)
 end
 
 function libzip_file_set_external_attributes(archive, index, flags, opsys, attributes)
@@ -486,7 +489,7 @@ function libzip_name_locate(archive, fname, flags)
 end
 
 function libzip_set_archive_comment(archive, comment, len)
-    return ccall((:zip_set_archive_comment, libzip), Cint, (Ptr{LibZipT}, Ptr{UInt8}, Cint), archive, comment, len)
+    return ccall((:zip_set_archive_comment, libzip), Cint, (Ptr{LibZipT}, Ptr{UInt8}, Cushort), archive, comment, len)
 end
 
 function libzip_get_archive_comment(archive, lenp, flags)
@@ -520,7 +523,7 @@ function libzip_fopen_index_encrypted(archive, index, flags, password)
 end
 
 function libzip_fread(file, buf, nbytes)
-    return ccall((:zip_fread, libzip), Int64, (Ptr{LibZipFileT}, Ptr{Cvoid}, Cuint), file, buf, nbytes)
+    return ccall((:zip_fread, libzip), Int64, (Ptr{LibZipFileT}, Ptr{Cvoid}, UInt64), file, buf, nbytes)
 end
 
 function libzip_fclose(file)
@@ -548,7 +551,7 @@ function libzip_error_init(error)
 end
 
 function libzip_error_init_with_code(error, ze)
-    return ccall((:zip_error_init_with_code, libzip), Cvoid, (Ptr{LibZipErrorT}, Clonglong), error, ze)
+    return ccall((:zip_error_init_with_code, libzip), Cvoid, (Ptr{LibZipErrorT}, Cint), error, ze)
 end
 
 function libzip_get_error(archive)

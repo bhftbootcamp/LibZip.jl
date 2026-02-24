@@ -66,9 +66,9 @@ struct ZipError <: Exception
         return new(code, message)
     end
 
-    function ZipError(code::Int32)
+    function ZipError(code::Integer)
         _zip_error() do err_ref
-            libzip_error_init_with_code(err_ref, code)
+            libzip_error_init_with_code(err_ref, Int32(code))
             return ZipError(err_ref)
         end
     end
@@ -100,11 +100,11 @@ Represents a file contained in an [`ZipArchive`](@ref).
 struct ZipFile
     body::Vector{UInt8}
     name::String
-    index::Int
-    size::Int
-    comp_size::Int
+    index::Int64
+    size::Int64
+    comp_size::Int64
     time::DateTime
-    crc::Int
+    crc::UInt32
     comp_method::Int
     encryption_method::Int
 
@@ -132,11 +132,11 @@ struct ZipFile
     end
 end
 
-function compression_str(num::Int)
+function compression_str(num::Integer)
     return get(COMPRESSION_METHODS, num, "UNKNOWN")
 end
 
-function encryption_str(num::Int)
+function encryption_str(num::Integer)
     return get(ENCRYPTION_METHODS, num, "UNKNOWN")
 end
 
@@ -182,7 +182,7 @@ mutable struct ZipArchive
     end
 end
 
-function init_source(data::AbstractVector{UInt8}, freep::Int = 0)
+function init_source(data::AbstractVector{UInt8}, freep::Integer = 0)
     _zip_error() do err_ref
         ptr = GC.@preserve data libzip_source_buffer_create(pointer(data), length(data), freep, err_ref)
         ptr == C_NULL && throw(ZipError(err_ref))
@@ -190,7 +190,7 @@ function init_source(data::AbstractVector{UInt8}, freep::Int = 0)
     end
 end
 
-function init_source(path::AbstractString, start::Int = 0, len::Int = -1)
+function init_source(path::AbstractString, start::Integer = 0, len::Integer = -1)
     _zip_error() do err_ref
         ptr = GC.@preserve path libzip_source_file_create(pointer(path), start, len, err_ref)
         ptr == C_NULL && throw(ZipError(err_ref))
@@ -224,8 +224,8 @@ function Base.show(io::IO, zip::ZipArchive)
 end
 
 """
-    ZipArchive(data::Vector{UInt8}; flags::Int = LIBZIP_RDONLY) -> ZipArchive
-    ZipArchive(; flags::Int = LIBZIP_CREATE) -> ZipArchive
+    ZipArchive(data::Vector{UInt8}; flags::Integer = LIBZIP_RDONLY) -> ZipArchive
+    ZipArchive(; flags::Integer = LIBZIP_CREATE) -> ZipArchive
 
 Construct an empty [`ZipArchive`](@ref) or an existing one from an in-memory byte buffer with specified `flags`.
 
@@ -253,7 +253,7 @@ julia> ZipArchive(zip_file)
 """
 ZipArchive()
 
-function ZipArchive(data::AbstractVector{UInt8}; flags::Int = LIBZIP_RDONLY)
+function ZipArchive(data::AbstractVector{UInt8}; flags::Integer = LIBZIP_RDONLY)
     _zip_error() do err_ref
         source_ptr = init_source(data)
         archive_ptr = libzip_open_from_source(source_ptr, flags, err_ref)
@@ -264,7 +264,7 @@ function ZipArchive(data::AbstractVector{UInt8}; flags::Int = LIBZIP_RDONLY)
     end
 end
 
-function ZipArchive(; flags::Int = LIBZIP_CREATE)
+function ZipArchive(; flags::Integer = LIBZIP_CREATE)
     source_ptr = libzip_source_buffer_create(C_NULL, 0, 0, C_NULL)
     archive_ptr = libzip_open_from_source(source_ptr, flags, C_NULL)
     return ZipArchive(archive_ptr, source_ptr)
@@ -325,13 +325,13 @@ function _zip_error(f::Function)
 end
 
 """
-    zip_open(path::String; flags::Int = LIBZIP_RDONLY) -> ZipArchive
+    zip_open(path::String; flags::Integer = LIBZIP_RDONLY) -> ZipArchive
 
 Open a zip archive file by its `path` with specified `flags`.
 
 See also [`Open flags`](@ref open_flags) section.
 """
-function zip_open(path::AbstractString; flags::Int = LIBZIP_RDONLY)
+function zip_open(path::AbstractString; flags::Integer = LIBZIP_RDONLY)
     _zip_error() do err_ref
         source_ptr = init_source(path)
         archive_ptr = libzip_open_from_source(source_ptr, flags, err_ref)
@@ -370,8 +370,8 @@ function zip_discard(zip::ZipArchive)
 end
 
 """
-    zip_compress_file!(zip::ZipArchive, index::Int, method::Int = LIBZIP_CM_DEFAULT; compression_level::Int = 1)
-    zip_compress_file!(zip::ZipArchive, filename::String, method::Int = LIBZIP_CM_DEFAULT; compression_level::Int = 1)
+    zip_compress_file!(zip::ZipArchive, index::Integer, method::Integer = LIBZIP_CM_DEFAULT; compression_level::Integer = 1)
+    zip_compress_file!(zip::ZipArchive, filename::String, method::Integer = LIBZIP_CM_DEFAULT; compression_level::Integer = 1)
 
 Set the compression `method` for the file at position `index` or by `filename` in the `zip` archive.
 The `compression_level` argument defines the compression level.
@@ -382,9 +382,9 @@ function zip_compress_file! end
 
 function zip_compress_file!(
     zip::ZipArchive,
-    index::Int,
-    method::Int = LIBZIP_CM_DEFAULT;
-    compression_level::Int = 1,
+    index::Integer,
+    method::Integer = LIBZIP_CM_DEFAULT;
+    compression_level::Integer = 1,
 )
     @assert isopen(zip) "ZipArchive is closed."
     status = libzip_set_file_compression(zip.archive_ptr, index, method, compression_level)
@@ -395,14 +395,14 @@ end
 function zip_compress_file!(
     zip::ZipArchive,
     filename::AbstractString,
-    method::Int = LIBZIP_CM_DEFAULT;
+    method::Integer = LIBZIP_CM_DEFAULT;
     kw...,
 )
     return zip_compress_file!(zip, locate_file(zip, filename), method; kw...)
 end
 
 """
-    zip_encrypt_file!(zip::ZipArchive, index::Int, password::String; method::UInt16 = LIBZIP_EM_AES_128)
+    zip_encrypt_file!(zip::ZipArchive, index::Integer, password::String; method::UInt16 = LIBZIP_EM_AES_128)
     zip_encrypt_file!(zip::ZipArchive, filename::String, password::String; method::UInt16 = LIBZIP_EM_AES_128)
 
 Set the encryption `method` for the file at position `index` or by `filename` in the `zip` archive using the `password`.
@@ -413,7 +413,7 @@ function zip_encrypt_file! end
 
 function zip_encrypt_file!(
     zip::ZipArchive,
-    index::Int,
+    index::Integer,
     password::AbstractString;
     method::UInt16 = LIBZIP_EM_AES_128,
 )
@@ -459,7 +459,7 @@ end
 
 """
     zip_get_file_info(zip::ZipArchive, filename::String; flags::UInt32 = LIBZIP_FL_ENC_GUESS)
-    zip_get_file_info(zip::ZipArchive, index::Int; flags::UInt32 = LIBZIP_FL_ENC_GUESS)
+    zip_get_file_info(zip::ZipArchive, index::Integer; flags::UInt32 = LIBZIP_FL_ENC_GUESS)
 
 Return information about the `filename` in a `zip` archive.
 
@@ -467,7 +467,7 @@ See also [`File info flags`](@ref file_info_flags) section.
 """
 function zip_get_file_info end
 
-function zip_get_file_info(zip::ZipArchive, index::Int; flags::UInt32 = LIBZIP_FL_ENC_GUESS)
+function zip_get_file_info(zip::ZipArchive, index::Integer; flags::UInt32 = LIBZIP_FL_ENC_GUESS)
     @assert isopen(zip) "ZipArchive is closed."
     info = LibZipStatT()
     info_ptr = pointer_from_objref(info)
@@ -512,7 +512,7 @@ end
 #__ IO
 
 """
-    read(zip::ZipArchive, index::Int; kw...) -> Vector{UInt8}
+    read(zip::ZipArchive, index::Integer; kw...) -> Vector{UInt8}
     read(zip::ZipArchive, filename::String; kw...) -> Vector{UInt8}
 
 Read the file contents of a `zip` archive by `index` or `filename`.
@@ -525,7 +525,7 @@ See also [`Read file flags`](@ref read_file_flags) section.
 """
 function Base.read(
     zip::ZipArchive,
-    index::Int;
+    index::Integer;
     flags::UInt32 = LIBZIP_FL_ENC_GUESS,
     password::Union{Nothing,AbstractString} = nothing,
 )
