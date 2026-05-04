@@ -318,7 +318,7 @@ function _zip_error(f::Function)
     err = Ref{LibZipErrorT}(LibZipErrorT())
     libzip_error_init(err)
     try
-      return f(err)
+        return f(err)
     finally
         zip_error_fini(err)
     end
